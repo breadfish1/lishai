@@ -4,6 +4,8 @@
 
 #define SZ 21
 
+// ПЛЮС БОРДЮРЧИКС
+
 using namespace std;
 
 class healthy;
@@ -40,7 +42,7 @@ protected:
 
 class infected: public immunity {
 public:
-    // infected(int x, int y) { coord.x = x; coord.y = y; count = 6; } СПРОСИТЬ !!!
+    // infected(int x, int y) { coord.x = x; coord.y = y; count = 6; }
     infected(int x, int y) : immunity(x, y) { count = 6; }
     healthy *NextStage(material &X);
     int Type() const { return 2; }
@@ -48,7 +50,7 @@ protected:
     void Infect(material &X);
 };
 
-class material { // ГРАНИЦЫ В КОНСТРУКТОРЕ
+class material {
 public:
     material();
     ~material();
@@ -57,7 +59,7 @@ public:
     void Print() const;
     void Start();
     void TailCut(healthy *h);
-    void BecomeInfected();
+    void BecomeInfected(int x, int y);
 private:
     node *AddHead(node *head, healthy *_c); // добавить голову
     node *Delete(node *t, healthy *_c); // удалить элемент по значению
@@ -65,18 +67,24 @@ private:
     node *head;
 };
 
+void material::BecomeInfected(int x, int y) {
+    delete m[x][y];
+    m[x][y] = new infected(x, y);
+    head = AddHead(head, m[x][y]);
+}
+
 node *material::AddHead(node *head, healthy *_c) {
     node *p = new node;
     
-    if (head) {
+    //if (head) {
         p->h = _c;
-        p->next = NULL;
+        p->next = head;
         return p;
-    }
+   // }
     
-    p->h = _c;
-    p->next = head;
-    return p;
+//    p->h = _c;
+//    p->next = NULL;
+//    return p;
 }
 
 node *material::Delete(node *t, healthy *_c) {
@@ -98,10 +106,14 @@ node *material::Delete(node *t, healthy *_c) {
 }
 
 void infected::Infect(material &X) {
-    int lim = 8;
-    while (lim > 0) {
-        //coord.x
-        //coord.y
+    int lim = 8, r;
+    for (int i = -1; i <= 1; i++) {
+        for (int j = -1; j <= 1; j++) {
+            healthy *a = X.GetCell(coord.x + i, coord.y + j);
+            r = rand()%2;
+            if ((i || j) && a->Type() == 1 && r) // + ПРЕДЕЛЫ МАССИВА
+                X.BecomeInfected(coord.x + i, coord.y + j);
+        }
     }
 }
 
@@ -111,19 +123,19 @@ healthy *infected::NextStage(material &X) {
     
     healthy *n = this;
     if (count == 0) { // если счетчик равен 0, то клетка становится имунной
-        delete this;
+        delete n;
         n = new immunity(coord.x, coord.y);
     }
     
     return n;
 }
 
-healthy *immunity::NextStage(material &X) {
+healthy *immunity::NextStage(material &X) { // ПЕРЕД ВЫЗОВОМ СОХРАНЯЕМ СТАРЫЙ УКАЗАТЕЛЬ, ВОЗВРАЩАЕМ this ИЛИ new healthy, СРАВНИВАЕМ С СОХРАНЕННЫМ, ЕСЛИ НУЖНО, ТО ПЕРЕПРИСВАИВАЕМ...
     count--; // отнимаем счетчик
     
     healthy *n = this;
     if (count == 0) { // если равен нулю, то клетка становится здорвой, ура!!!
-        delete this;
+        delete n;
         n = new healthy(coord.x, coord.y);
     }
     
@@ -132,7 +144,22 @@ healthy *immunity::NextStage(material &X) {
 
 void material::Print() const {
     int a;
-    
+
+//    node *temp = head;
+//
+//    while (temp) {
+//        a = temp->h->Type();
+//        if (a == 1)
+//            cout << "🌝" << " -> ";
+//        if (a == 2)
+//            cout << "🌚" << " -> ";
+//        if (a == 3)
+//            cout << "🌎" << " -> ";
+//        temp = temp->next;
+//    }
+//
+//    cout << endl << endl;
+
     for(int i = 0; i < SZ; i++) {
         for(int j = 0; j < SZ; j++) {
             a = m[i][j]->Type();
@@ -145,6 +172,7 @@ void material::Print() const {
         }
         cout << endl;
     }
+    cout << endl;
 }
 
 node *material::Clean(node *h) {
@@ -162,14 +190,23 @@ node *material::Clean(node *h) {
 
 material::material() {
     int n = SZ/2;
+    head = NULL;
     
-    for (int i = 0; i < SZ; i++)
-        for (int j = 0; j < SZ; j++)
+    for (int i = 1; i < SZ - 1; i++)
+        for (int j = 1; j < SZ - 1; j++)
             m[i][j] = new healthy(i, j);
     
     delete m[n][n];
     
     m[n][n] = new infected(n, n); // центральная
+    
+    int s = SZ - 1;
+    for (int i = 0; i < SZ; i++) {
+        m[i][0] = new infected(i, 0);
+        m[0][i] = new infected(0, i);
+        m[s][i] = new infected(s, i);
+        m[i][s] = new infected(i, s);
+    }
     
     head = AddHead(head, m[n][n]);
 }
@@ -179,36 +216,42 @@ material::~material() {
 }
 
 void material::TailCut(healthy *h) {
-    if (head->h == h) { // если нужно удалить начиная с головы
+    if (head->h == h) {
         Clean(head);
         head = NULL;
-        
-        return;
     }
-    
-    
+    else {
+        node *p = head;
+        node *t = p->next;
+        while(t->h != h) {
+            p = t;
+            t = p->next;
+        }
+
+        p->next = NULL;
+        Clean(t);
+    }
 }
 
 void material::Start() { // вот тут-то все и происходит
-    node *temporary;
-    healthy *e, *temp;
+    node *temporary, *mem = NULL;
     
     while (head) { // идем по списку, пока он не окажется пуст
         temporary = head;
         while (temporary) { // делаем одну полную итерацию
             temporary->h = temporary->h->NextStage(*this);
-            if (temporary->h->Type() == 1) {
-                
-                break;
-            }
+            if (temporary->h->Type() == 1) // ОСТАЛЬНЫЕ ТОЖЕ НУЖНО СДЕЛАТЬ ЗДОРОВЫМИ
+                mem = temporary;
             temporary = temporary->next;
         }
-        
+        Print();
+        if (mem != NULL)
+            TailCut(mem->h); // ??
     }
 }
 
 int main() {
     material Mat;
     Mat.Print();
-    //Mat.Start();
+    Mat.Start();
 }
