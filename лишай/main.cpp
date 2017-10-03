@@ -1,6 +1,8 @@
 #include <iostream>
+#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <curses.h>
 
 #define SZ 21
 
@@ -164,20 +166,21 @@ void material::Print() const {
 //    }
 //
 //    cout << endl << endl;
-    
+
+    system("clear");
     
     for(int i = 0; i < SZ; i++) {
         for(int j = 0; j < SZ; j++) {
             a = m[i][j]->Type();
             if (a == 1)
-                cout << ".";
-                //cout << "🌝";
+                //cout << ".";
+                cout << "🌝";
             if (a == 2)
-                cout << "X";
-                //cout << "🌚";
+                //cout << "X";
+                cout << "🌚";
             if (a == 3)
-                cout << "-";
-                //cout << "🌎";
+                //cout << "-";
+                cout << "🌎";
         }
         cout << endl;
     }
