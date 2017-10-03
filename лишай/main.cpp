@@ -25,7 +25,7 @@ public:
 class healthy {
 public:
     healthy(int x, int y) { coord.x = x; coord.y = y; }
-    virtual healthy *NextStage(material &X) { return NULL; }
+    virtual healthy *NextStage(material &X) { return this; }
     virtual int Type() const { return 1; }
 protected:
     coordinate coord;
@@ -58,14 +58,19 @@ public:
     node *Clean(node *h);
     void Print() const;
     void Start();
-    void TailCut(healthy *h);
+    node *TailCut(healthy *h);
     void BecomeInfected(int x, int y);
+    void EditHealthy(int x, int y, healthy *h);
 private:
     node *AddHead(node *head, healthy *_c); // добавить голову
     node *Delete(node *t, healthy *_c); // удалить элемент по значению
     healthy *m[SZ][SZ];
     node *head;
 };
+
+void material::EditHealthy(int x, int y, healthy *h) {
+    m[x][y] = h;
+}
 
 void material::BecomeInfected(int x, int y) {
     delete m[x][y];
@@ -76,15 +81,9 @@ void material::BecomeInfected(int x, int y) {
 node *material::AddHead(node *head, healthy *_c) {
     node *p = new node;
     
-    //if (head) {
-        p->h = _c;
-        p->next = head;
-        return p;
-   // }
-    
-//    p->h = _c;
-//    p->next = NULL;
-//    return p;
+    p->h = _c;
+    p->next = head;
+    return p;
 }
 
 node *material::Delete(node *t, healthy *_c) {
@@ -106,13 +105,15 @@ node *material::Delete(node *t, healthy *_c) {
 }
 
 void infected::Infect(material &X) {
-    int lim = 8, r;
+    int r;
     for (int i = -1; i <= 1; i++) {
         for (int j = -1; j <= 1; j++) {
             healthy *a = X.GetCell(coord.x + i, coord.y + j);
             r = rand()%2;
-            if ((i || j) && a->Type() == 1 && r) // + ПРЕДЕЛЫ МАССИВА
+            if ((i || j) && a != NULL && a->Type() == 1 && r) {
                 X.BecomeInfected(coord.x + i, coord.y + j);
+                return;
+            }
         }
     }
 }
@@ -127,6 +128,8 @@ healthy *infected::NextStage(material &X) {
         n = new immunity(coord.x, coord.y);
     }
     
+    X.EditHealthy(coord.x, coord.y, n);
+    
     return n;
 }
 
@@ -139,14 +142,16 @@ healthy *immunity::NextStage(material &X) { // ПЕРЕД ВЫЗОВОМ СОХ�
         n = new healthy(coord.x, coord.y);
     }
     
+    X.EditHealthy(coord.x, coord.y, n);
+    
     return n;
 }
 
 void material::Print() const {
     int a;
 
-//    node *temp = head;
-//
+    node *temp = head;
+    
 //    while (temp) {
 //        a = temp->h->Type();
 //        if (a == 1)
@@ -159,16 +164,20 @@ void material::Print() const {
 //    }
 //
 //    cout << endl << endl;
-
+    
+    
     for(int i = 0; i < SZ; i++) {
         for(int j = 0; j < SZ; j++) {
             a = m[i][j]->Type();
             if (a == 1)
-                cout << "🌝";
+                cout << ".";
+                //cout << "🌝";
             if (a == 2)
-                cout << "🌚";
+                cout << "X";
+                //cout << "🌚";
             if (a == 3)
-                cout << "🌎";
+                cout << "-";
+                //cout << "🌎";
         }
         cout << endl;
     }
@@ -215,7 +224,7 @@ material::~material() {
     head = Clean(head);
 }
 
-void material::TailCut(healthy *h) {
+node *material::TailCut(healthy *h) {
     if (head->h == h) {
         Clean(head);
         head = NULL;
@@ -231,22 +240,31 @@ void material::TailCut(healthy *h) {
         p->next = NULL;
         Clean(t);
     }
+    
+    return head;
 }
 
 void material::Start() { // вот тут-то все и происходит
     node *temporary, *mem = NULL;
-    
+
     while (head) { // идем по списку, пока он не окажется пуст
         temporary = head;
         while (temporary) { // делаем одну полную итерацию
             temporary->h = temporary->h->NextStage(*this);
             if (temporary->h->Type() == 1) // ОСТАЛЬНЫЕ ТОЖЕ НУЖНО СДЕЛАТЬ ЗДОРОВЫМИ
-                mem = temporary;
+                break;
             temporary = temporary->next;
         }
-        Print();
+        
+        mem = temporary;
+        while (temporary) {
+            temporary->h = temporary->h->NextStage(*this);
+            temporary = temporary->next;
+        }
+        
         if (mem != NULL)
-            TailCut(mem->h); // ??
+            head = TailCut(mem->h); // ??
+        Print();
     }
 }
 
